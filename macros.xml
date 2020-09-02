@@ -2,7 +2,6 @@
 <macros>
     <xml name="requirements">
         <requirements>
-            <requirement type="package" version="3.6.3">R</requirement>
             <requirement type="package" version="@VERSION@">naivestates</requirement>
         </requirements>
     </xml>
