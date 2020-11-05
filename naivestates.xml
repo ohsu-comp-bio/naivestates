@@ -1,5 +1,5 @@
-<tool id="naivestates" name="naivestates" version="@VERSION@.1" profile="17.09">
-    <description></description>
+<tool id="naivestates" name="naivestates" version="@VERSION@.2" profile="17.09">
+    <description> Inference of cell states using Naive Bayes</description>
     <macros>
         <import>macros.xml</import>
     </macros>
@@ -11,9 +11,30 @@
 
         @CMD_BEGIN@
         -i '$counts'
+
+        #if $markers
+        -m $markers
+        #end if
+        
+        --mct $mct
+        -p $plots
+
+        #if $id
+        --id $id
+        #end if
+
+        --log $log
+
+        #if $sfx
+        --sfx $sfx
+        #end if
+
+        #if $umap
+        --umap
+        #end if
         -o .
-        -p png
-        --mct '$typemap';
+
+        &&
 
         mv *-states.csv states.csv;
         mv plots/*-probs.png plots/probs.png;
@@ -24,7 +45,21 @@
 
     <inputs>
         <param name="counts" type="data" format="csv" label="Quantified Cell Matrix"/>
-        <param name="typemap" type="data" format="csv" label="Marker-State Association Map"/>
+        <param name="markers" type="data" format="txt" optional="true" label="Markers to model"/>
+        <param name="mct" type="data" format="csv" label="Marker-State Association Map"/>
+        <param name="plots" type="select" label="Generate plots showing the fit">
+            <option selected="true" value="png">png</option>
+            <option value="pdf">pdf</option>
+            <option value="off">off</option>
+        </param>
+        <param name="id" type="text" value="" label="Column name containing cell IDs"/>
+        <param name="log" type="select" label="Log Transform" help="Whether to apply a log transform">
+            <option selected="true" value="auto">auto</option>
+            <option value="yes">yes</option>
+            <option value="no">no</option>
+        </param>
+        <param name="sfx" type="text" value="_cellMask" optional="true" label="Common suffix" help="Common suffix on marker columns (e.g., _cellMask)"/>
+        <param name="umap" type="boolean" checked="true" label="Generate UMAP plots"/>
     </inputs>
 
     <outputs>
