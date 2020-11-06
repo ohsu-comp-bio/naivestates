@@ -37,8 +37,12 @@
         &&
 
         mv *-states.csv states.csv;
-        mv plots/*-probs.png plots/probs.png;
-        mv plots/*-summary.png plots/summary.png;
+
+        #if $plots != "off"
+        mv plots/*-probs.${plots} plots/probs.${plots};
+        mv plots/*-summary.${plots} plots/summary.${plots};
+        mv plots/*-allfits.${plots} plots/allfits.${plots};
+        #end if
 
     ]]></command>
 
@@ -64,8 +68,24 @@
 
     <outputs>
         <data format="csv" name="states" from_work_dir="states.csv" label="${tool.name} on ${on_string}: States CSV"/>
-        <data format="png" name="probs" from_work_dir="plots/probs.png" label="${tool.name} on ${on_string}: Probabilities"/>
-        <data format="png" name="summary" from_work_dir="plots/summary.png" label="${tool.name} on ${on_string}: Summary"/>
+        <data format="png" name="probs-png" from_work_dir="plots/probs.png" label="${tool.name} on ${on_string}: Probabilities">
+            <filter>$plots == 'png'</filter>
+        </data>
+        <data format="png" name="summary-png" from_work_dir="plots/summary.png" label="${tool.name} on ${on_string}: Summary">
+            <filter>$plots == 'png'</filter>
+        </data>
+        <data format="png" name="allfits-png" from_work_dir="plots/allfits.png" label="${tool.name} on ${on_string}: AllFits">
+            <filter>$plots == 'png'</filter>
+        </data>
+        <data format="pdf" name="probs-pdf" from_work_dir="plots/probs.pdf" label="${tool.name} on ${on_string}: Probabilities">
+            <filter>$plots == 'pdf'</filter>
+        </data>
+        <data format="pdf" name="summary-pdf" from_work_dir="plots/summary.pdf" label="${tool.name} on ${on_string}: Summary">
+            <filter>$plots == 'pdf'</filter>
+        </data>
+        <data format="pdf" name="allfits-pdf" from_work_dir="plots/allfits.pdf" label="${tool.name} on ${on_string}: AllFits">
+            <filter>$plots == 'pdf'</filter>
+        </data>
     </outputs>
     <help><![CDATA[
 naivestates - Inference of cell states using Naive Bayes
