@@ -2,7 +2,7 @@
 <macros>
     <xml name="requirements">
         <requirements>
-            <requirement type="package" version="@VERSION@">naivestates</requirement>
+            <requirement type="package" version="@VERSION@">naivestatess</requirement>
         </requirements>
     </xml>
 
