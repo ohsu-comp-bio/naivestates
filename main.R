@@ -26,7 +26,9 @@ option_list <- list(
     make_option("--log", type="character", default="auto",
                 help="Whether to apply a log transform <yes|no|auto>"),
     make_option("--sfx", type="character", default="",
-                help="Common suffix on marker columns (e.g., _cellMask)")
+                help="Common suffix on marker columns (e.g., _cellMask)"),
+    make_option("--umap", action="store_true", default=FALSE,
+                help="Generate UMAP plots")
 )
 opt <- parse_args(OptionParser(option_list=option_list))
 
@@ -37,10 +39,6 @@ if( !(opt$log %in% c("yes","no","auto")) )
     stop( "--log must be one of <yes|no|auto>" )
 if( !(opt$plots %in% c("off", "pdf", "png")) )
     stop( "--plots must be one of <off|pdf|png>" )
-
-## Find the default cell type map
-if( opt$mct == "" )
-    opt$mct <- file.path( wd, "typemap.csv" )
 
 ## Identify the sample name
 sn <- basename( opt$`in` ) %>% str_split( "\\." ) %>%
@@ -66,29 +64,9 @@ if( !(opt$id %in% colnames(X)) )
               "; use --id to specify which column contains cell IDs" )
 }
 
-## Determine the suffix in the available data columns (if not specified)
-if( opt$sfx == "" )
-    opt$sfx <- setdiff(colnames(X), opt$id) %>% autoMarkers %>% autoSuffix
-
-## Determine if we're working with a file of markers or if
-##   markers are specified as a comma,delimited,list
-if( file.exists(opt$markers) ) {
-    mrk <- scan(opt$markers, what=character(), quiet=TRUE)
-} else if( opt$markers == "auto" ) {
-    mrk <- autoMarkers(setdiff(colnames(X), opt$id))
-    if( opt$sfx != "$" ) mrk <- keep( mrk, ~grepl(opt$sfx, .x) )
-} else {
-    mrk <- str_split( opt$markers, "," )[[1]]
-}
-
-## Remove the suffix if it's already present in the requested names
-##   since findMarkers() will append it
-mrk <- str_replace( mrk, opt$sfx, "" )
-
 ## Identify markers in the matrix
-cat( "Looking for markers", str_flatten(mrk, ", "), "with suffix", opt$sfx, "\n" )
-mrkv <- findMarkers( colnames(X), mrk, opt$sfx, TRUE, TRUE )
-cat( "Found markers:", str_flatten(names(mrkv), ", "), "\n" )
+mrkv <- findMarkers(setdiff(colnames(X), opt$id), opt$markers,
+                    opt$sfx, TRUE, TRUE, TRUE)
 
 ## Handle log transformation of the data
 if( opt$log == "yes" ||
@@ -100,30 +78,41 @@ if( opt$log == "yes" ||
 
 ## Fit Gaussian mixture models
 GMM <- GMMfit(X, opt$id, !!!mrkv)
+fnMdl <- file.path( opt$out, str_c(sn, "-models.csv") )
+cat( "Saving models to", fnMdl, "\n" )
+GMMmodels(GMM) %>% write_csv( fnMdl )
+
+## Reshape the matrix back to cells-by-marker format
 Y <- GMMreshape(GMM)
 
 cat( "------\n" )
 
-## Load marker -> cell type associations
-cat( "Loading cell type map from", opt$mct, "\n" )
-tm <- read_csv( opt$mct, col_types=cols() ) %>% deframe()
-mct <- findMarkers( colnames(Y), names(tm) )
-mct <- set_names( tm[names(mct)], mct )
+## Find the default cell type map
+if( opt$mct != "" ) {
 
-if( length(mct) == 0 ) {
-    warning( "No usable marker -> cell type mappings detected" )
-    Y <- callStates(Y, opt$id)
+    ## Load marker -> cell type associations
+    cat( "Loading cell type map from", opt$mct, "\n" )
+    mct <- read_csv( opt$mct, col_types=cols() ) %>%
+        distinct() %>% filter(Marker %in% colnames(Y))
+
+    if( nrow(mct) == 0 ) {
+        warning( "No usable marker -> cell type mappings detected" )
+        Y <- findDominant(Y, opt$id)
+    } else {
+        cat( "Using the following marker -> cell type map:\n" )
+        walk2( mct$Marker, mct$State, ~cat(.x, "->", .y, "\n") )
+        Y <- callStates(Y, opt$id, mct)
+    }
 } else {
-    cat( "Using the following marker -> cell type map:\n" )
-    iwalk( mct, ~cat( .y, "->", .x, "\n" ) )
-    Y <- callStates(Y, opt$id, mct)
+    cat( "No marker -> cell type mapping provided\n" )
+    Y <- findDominant(Y, opt$id)
 }
 
 cat( "------\n" )
 
 ## Identify the output location(s)
 fnOut <- file.path( opt$out, str_c(sn, "-states.csv") )
-cat( "Saving results to", fnOut, "\n")
+cat( "Saving probabilities and calls to", fnOut, "\n")
 Y %>% write_csv( fnOut )
 
 ## Generates plots as necessary
@@ -133,26 +122,33 @@ if( opt$plots != "off" )
     dirPlot <- file.path( opt$out, "plots", sn )
     dir.create(dirPlot, recursive=TRUE, showWarnings=FALSE)
 
-    ## Compute a UMAP projection
-    cat( "Computing a UMAP projection...\n" )
-    U <- umap( Y, c(opt$id, "State", "Anchor") )
+    ## Fit overview
+    fn <- file.path( file.path(opt$out, "plots"), str_c(sn, "-allfits.", opt$plots) )
+    ggf <- plotFitOverview(GMM)
+    suppressMessages(ggsave( fn, ggf, width=12, height=8 ))
     
-    ## Generate and write a summary plot
-    gg <- plotSummary( U )
-    fn <- file.path( file.path(opt$out, "plots"), str_c(sn, "-summary.", opt$plots) )
-    suppressMessages(ggsave( fn, gg, width=9, height=7 ))
-    cat( "Plotted summary to", fn, "\n" )
+    ## Compute a UMAP projection
+    if( opt$umap ) {
+        cat( "Computing a UMAP projection...\n" )
+        U <- umap( Y, c(opt$id, "State", "Dominant") )
+    
+        ## Generate and write a summary plot
+        gg <- plotSummary( U )
+        fn <- file.path( file.path(opt$out, "plots"), str_c(sn, "-summary.", opt$plots) )
+        suppressMessages(ggsave( fn, gg, width=9, height=7 ))
+        cat( "Plotted summary to", fn, "\n" )
 
-    ## Generate and write faceted probabilities plot
-    gg <- plotProbs( U, c(opt$id, "State", "Anchor") )
-    fn <- file.path( file.path(opt$out, "plots"), str_c(sn, "-probs.", opt$plots) )
-    suppressMessages(ggsave( fn, gg, width=9, height=7 ))
-    cat( "Plotted probabilities to", fn, "\n" )
+        ## Generate and write faceted probabilities plot
+        gg <- plotProbs( U, c(opt$id, "State", "Dominant") )
+        fn <- file.path( file.path(opt$out, "plots"), str_c(sn, "-probs.", opt$plots) )
+        suppressMessages(ggsave( fn, gg, width=9, height=7 ))
+        cat( "Plotted probabilities to", fn, "\n" )
+    }
 
     ## Generate and write out plots for individual marker fits
     for( i in names(mrkv) )
     {
-        gg <- plotFit(GMM, i)
+        gg <- plotMarker(GMM, i)
         fn <- file.path( dirPlot, str_c(i,".",opt$plots) )
         suppressMessages(ggsave( fn, gg ))
         cat( "Wrote", fn, "\n" )
