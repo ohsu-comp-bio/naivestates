@@ -1,4 +1,4 @@
-<tool id="naivestates" name="naivestates" version="@VERSION@.2" profile="17.09">
+<tool id="naivestates" name="naivestates" version="@VERSION@.3" profile="17.09">
     <description> Inference of cell states using Naive Bayes</description>
     <macros>
         <import>macros.xml</import>

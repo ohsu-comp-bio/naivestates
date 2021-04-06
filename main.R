@@ -66,7 +66,7 @@ if( !(opt$id %in% colnames(X)) )
 
 ## Identify markers in the matrix
 mrkv <- findMarkers(setdiff(colnames(X), opt$id), opt$markers,
-                    opt$sfx, TRUE, TRUE, TRUE)
+                    opt$sfx, TRUE, TRUE)
 
 ## Handle log transformation of the data
 if( opt$log == "yes" ||
