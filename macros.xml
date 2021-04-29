@@ -2,7 +2,7 @@
 <macros>
     <xml name="requirements">
         <requirements>
-            <container type="docker">labsyspharm/naivestates:1.6.1</container>
+            <container type="docker">labsyspharm/naivestates:@VERSION@</container>
             <requirement type="package" version="@VERSION@">naivestates</requirement>
         </requirements>
     </xml>
